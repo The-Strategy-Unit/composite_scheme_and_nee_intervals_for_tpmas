@@ -1,0 +1,317 @@
+---
+title: Derive custom composite intervals
+lang: en-GB
+embed-resources: true
+minimal: true
+code-fold: true
+params:
+  inflation_years: 18
+  rds_filename: visualising_uncertainty_intervals
+---
+
+```{r}
+#| label: setup
+inflation_years <- as.integer(params[["inflation_years"]])
+rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
+
+```
+
+
+```{r}
+#| label: get source data from Connect
+#| message: false
+
+pins_folder <- azkit::check_envvar("PINS_FOLDER")
+su_connect_pins_board <- pins::board_connect(auth = "envvar")
+
+nhp_tagged_runs_meta <- su_connect_pins_board |>
+  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_meta"))
+
+params_data_init <- su_connect_pins_board |>
+  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_params"))
+
+```
+
+
+```{r}
+#| label: get source data from Azure
+
+az_token <- azkit::get_auth_token()
+
+tpma_lookup <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
+  azkit::get_container(token = az_token) |>
+  azkit::read_azure_csv("mitigator-lookup.csv", col_types = "-ccc-----") |>
+  dplyr::rename(
+    change_factor = "mitigator_type",
+    strategy = "mitigator_variable",
+    strategy_name = "mitigator_name"
+  )
+
+nee_intervals <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
+  azkit::get_container(token = az_token) |>
+  # AzureStor::storage_load_rds("nee_table.rds", type = "none") |>
+  azkit::read_azure_rds("nee_table.rds", type = "none") |>
+  dplyr::rename_with(stringr::str_to_snake) |>
+  dplyr::select(
+    change_factor = "type",
+    type = "strategy_type",
+    strategy = "param_name",
+    p10 = "lower_ci",
+    p90 = "upper_ci"
+  ) |>
+  dplyr::mutate(
+    dplyr::across("type", \(x) {
+      dplyr::case_when(
+        grepl("^inpatient", x) ~ "ip",
+        grepl("^length of stay", x) ~ "ip",
+        grepl("^outpatient", x) ~ "op",
+        grepl("^A&E", x) ~ "aae",
+        .default = x
+      )
+    }),
+    dplyr::across(c("p10", "p90"), \(x) x / 100)
+  )
+
+```
+
+```{r}
+#| label: preferred runs
+
+run_stages <- c("final_report_ndg2", "final_report_ndg3", "final_report_ndg1")
+
+preferred_runs <- nhp_tagged_runs_meta |>
+  dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
+  dplyr::slice_min(
+    match(.data[["run_stage"]], {{ run_stages }}),
+    by = "dataset"
+  ) |>
+  dplyr::select(!"file")
+
+preferred_run_names <- preferred_runs |>
+  glue::glue_data("{dataset}_{scenario}_{create_datetime}")
+
+params_data <- params_data_init |>
+  purrr::keep_at(preferred_run_names)
+
+# fmt: skip
+core_elements <- c(
+  "dataset", "scenario", "start_year",
+  "end_year", "app_version", "create_datetime"
+)
+params_data_tbl_summary <- params_data |>
+  purrr::map(\(x) purrr::keep_at(x, core_elements)) |>
+  purrr::map(tibble::as_tibble_row) |>
+  purrr::list_rbind() |>
+  dplyr::mutate(dplyr::across(tidyselect::ends_with("year"), as.integer))
+```
+
+```{r}
+#| label: extract intervals
+
+create_intervals_tbl <- function(lst) {
+  lst |>
+    purrr::map_depth(2, \(x) list(x[["interval"]])) |>
+    purrr::imap(\(x, y) dplyr::bind_cols(type = y, tibble::as_tibble_row(x))) |>
+    purrr::list_rbind() |>
+    tidyr::pivot_longer(
+      !"type",
+      names_to = "strategy",
+      values_drop_na = TRUE
+    ) |>
+    tidyr::unnest_wider("value", names_sep = "_") |>
+    dplyr::rename(p10 = "value_1", p90 = "value_2")
+}
+
+
+combined_intervals_tbl <- params_data |>
+  purrr::map(\(x) purrr::keep_at(x, c("activity_avoidance", "efficiencies"))) |>
+  purrr::map_depth(2, create_intervals_tbl) |>
+  purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
+  purrr::list_rbind(names_to = "run_label") |>
+  # only include "approved" list of strategies (excludes "bads_*"))
+  dplyr::inner_join(tpma_lookup, c("change_factor", "strategy")) |>
+  dplyr::relocate("strategy_name", .after = "strategy")
+
+```
+
+
+```{r}
+#| label: remove rows with inapplicable values
+
+remove_rows <- combined_intervals_tbl |>
+  dplyr::select(c("run_label", "strategy")) |>
+  dplyr::filter(
+    (grepl("^RH5", .data[["run_label"]]) &
+      .data[["strategy"]] == "virtual_wards_activity_avoidance_ari") |
+      (grepl("^RAS", .data[["run_label"]]) &
+        (grepl("adult_non-surgical$", .data[["strategy"]]) |
+          .data[["strategy"]] == "pre-op_los_1-day")) |
+      (grepl("^RGN", .data[["run_label"]]) &
+        grepl("^discharged_no_treatment_.*_ambulance$", .data[["strategy"]])) |
+      (grepl("^RTX", .data[["run_label"]]) &
+        .data[["strategy"]] %in%
+          c(
+            "stroke_early_supported_discharge",
+            "virtual_wards_efficiencies_ari",
+            "raid_ip",
+            "virtual_wards_efficiencies_heart_failure"
+          ))
+  )
+
+tidy_intervals_tbl <- combined_intervals_tbl |>
+  dplyr::anti_join(remove_rows, c("run_label", "strategy")) |>
+  dplyr::filter(dplyr::if_all(c("p10", "p90"), \(x) dplyr::between(x, 0, 1)))
+
+```
+
+```{r}
+#| label: annualise scheme intervals
+run_lookup <- params_data_tbl_summary |>
+  dplyr::select(!"app_version") |>
+  tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
+
+annualise <- \(x, p) `^`(x, (1 / p))
+
+annualised_intervals_tbl <- tidy_intervals_tbl |>
+  dplyr::left_join(run_lookup, "run_label") |>
+  dplyr::mutate(
+    period = .data[["end_year"]] - .data[["start_year"]],
+    .keep = "unused"
+  ) |>
+  dplyr::mutate(
+    dplyr::across(c("p10", "p90"), \(x) annualise(x, .data[["period"]])),
+    .keep = "unused"
+  )
+
+nee_period <- 20 # years between baseline and horizon, fixed for NEE estimates
+
+annualised_nee_intervals <- nee_intervals |>
+  dplyr::mutate(dplyr::across(c("p10", "p90"), \(x) annualise(x, nee_period)))
+```
+
+
+```{r}
+#| label: create_mixtures function
+create_mixtures <- function(intervals_tbl, colnames_vec) {
+  intervals_tbl |>
+    dplyr::mutate(
+      mu = (.data[["p10"]] + .data[["p90"]]) / 2,
+      sigma = (.data[["p90"]] - .data[["mu"]]) /
+        qnorm(p = 0.90, mean = 0, sd = 1),
+      dplyr::across("sigma", \(x) dplyr::if_else(x == 0, 0.0001, x)),
+      dist = purrr::map2(.data[["mu"]], .data[["sigma"]], \(m, s) {
+        distr::Truncate(distr::Norm(mean = m, sd = s), lower = 0, upper = 1)
+      })
+    ) |>
+    dplyr::summarise(
+      mixture = purrr::map(list(.data[["dist"]]), \(l) {
+        distr::UnivarMixingDistribution(Dlist = l)
+      }),
+      .by = tidyselect::all_of(colnames_vec)
+    )
+}
+
+```
+
+```{r}
+#| label: create mixtures across all scheme runs
+#| warning: false
+
+scheme_mixtures_tbl <- annualised_intervals_tbl |>
+  create_mixtures(c("type", "change_factor", "strategy"))
+
+scheme_intervals <- scheme_mixtures_tbl |>
+  dplyr::mutate(
+    p10 = purrr::map_dbl(.data[["mixture"]], \(m) m@q(p = 0.1)),
+    p90 = purrr::map_dbl(.data[["mixture"]], \(m) m@q(p = 0.9)),
+    .keep = "unused"
+  )
+```
+
+```{r}
+#| label: reinflate values
+
+init_joined_table <- list(scheme_intervals, annualised_nee_intervals) |>
+  rlang::set_names(c("schemes", "nee")) |>
+  dplyr::bind_rows(.id = "source")
+
+reinflate_intervals <- function(exp, tbl) {
+  dplyr::mutate(tbl, dplyr::across(c("p10", "p90"), \(x) x^exp))
+}
+
+final_joined_table <- inflation_years |>
+  purrr::map(\(x) reinflate_intervals(x, init_joined_table)) |>
+  rlang::set_names(paste0(inflation_years, "yr")) |>
+  purrr::list_rbind(names_to = "period") |>
+  # pivot_wider creates NA values in the table, where we are missing a NEE value
+  tidyr::pivot_wider(
+    names_from = c("source", "period"),
+    names_glue = "{source}_{period}_{.value}",
+    values_from = c("p10", "p90")
+  ) |>
+  tidyr::pivot_longer(
+    tidyselect::matches("p[19]0$"),
+    names_to = c("source", "period", "name"),
+    names_sep = "_",
+    cols_vary = "slowest"
+  ) |>
+  dplyr::mutate(dplyr::across("type", \(x) {
+    forcats::fct(x, c("ip", "op", "aae"))
+  })) |>
+  dplyr::arrange(dplyr::pick(c(
+    "type",
+    "change_factor",
+    "strategy",
+    "period",
+    "source"
+  ))) |>
+  # fill missing NEE values with scheme values as a fallback
+  tidyr::fill(
+    "value",
+    .by = c("type", "change_factor", "strategy", "period", "name"),
+    .direction = "up" # "nee" rows will be above "schemes" rows per group
+  ) |>
+  tidyr::pivot_wider()
+```
+
+```{r}
+#| label: convert table to named list of intervals data tables
+
+intervals_list <- final_joined_table |>
+  dplyr::mutate(
+    interval = purrr::map2(.data[["p10"]], .data[["p90"]], c),
+    .keep = "unused"
+  ) |>
+  dplyr::mutate(
+    dplyr::across("strategy", \(x) {
+      dplyr::if_else(
+        grepl("^ambulatory_emergency_care", x),
+        sub("^ambulatory", "same_day", x),
+        x
+      )
+    }),
+    dplyr::across("interval", \(x) purrr::map(x, \(x) list(interval = x)))
+  ) |>
+  tidyr::unite("scenario", c("source", "period")) |>
+  tidyr::nest(.by = "scenario") |>
+  tibble::deframe()
+
+```
+
+```{r}
+#| label: export data
+
+readr::write_rds(intervals_list, rds_fname)
+
+success <- file.exists(rds_fname) && tools::file_ext(rds_fname) == "rds"
+succ_msg <- glue::glue("File `{rds_fname}` has been created")
+
+```
+
+`r if (success) succ_msg`
+
+Names of tables in `intervals_list` (object saved to rds):
+
+```{r}
+names(intervals_list)
+```
