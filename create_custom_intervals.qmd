@@ -21,7 +21,7 @@ rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 #| label: get source data from Connect
 #| message: false
 
-pins_folder <- azkit::check_envvar("PINS_FOLDER")
+pins_folder <- Sys.getenv("PINS_FOLDER")
 su_connect_pins_board <- pins::board_connect(auth = "envvar")
 
 nhp_tagged_runs_meta <- su_connect_pins_board |>
@@ -37,9 +37,9 @@ params_data_init <- su_connect_pins_board |>
 #| label: get source data from Azure
 
 az_token <- azkit::get_auth_token()
+support_con_name <- Sys.getenv("AZ_SUPPORT_CONTAINER")
 
-tpma_lookup <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
-  azkit::get_container(token = az_token) |>
+tpma_lookup <- azkit::get_container(support_con_name, token = az_token) |>
   azkit::read_azure_csv("mitigator-lookup.csv", col_types = "-ccc-----") |>
   dplyr::rename(
     change_factor = "mitigator_type",
@@ -47,14 +47,12 @@ tpma_lookup <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
     strategy_name = "mitigator_name"
   )
 
-nee_intervals <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
-  azkit::get_container(token = az_token) |>
-  # AzureStor::storage_load_rds("nee_table.rds", type = "none") |>
+nee_intervals <- azkit::get_container(support_con_name, token = az_token) |>
   azkit::read_azure_rds("nee_table.rds", type = "none") |>
   dplyr::rename_with(stringr::str_to_snake) |>
   dplyr::select(
-    change_factor = "type",
     type = "strategy_type",
+    change_factor = "type",
     strategy = "param_name",
     p10 = "lower_ci",
     p90 = "upper_ci"
@@ -71,7 +69,6 @@ nee_intervals <- azkit::check_envvar("AZ_SUPPORT_CONTAINER") |>
     }),
     dplyr::across(c("p10", "p90"), \(x) x / 100)
   )
-
 ```
 
 ```{r}
@@ -284,11 +281,7 @@ intervals_list <- final_joined_table |>
   ) |>
   dplyr::mutate(
     dplyr::across("strategy", \(x) {
-      dplyr::if_else(
-        grepl("^ambulatory_emergency_care", x),
-        sub("^ambulatory", "same_day", x),
-        x
-      )
+      sub("^ambulatory_emergency", "same_day_emergency", x),
     }),
     dplyr::across("interval", \(x) purrr::map(x, \(x) list(interval = x)))
   ) |>
