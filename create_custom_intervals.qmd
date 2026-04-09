@@ -281,7 +281,7 @@ intervals_list <- final_joined_table |>
   ) |>
   dplyr::mutate(
     dplyr::across("strategy", \(x) {
-      sub("^ambulatory_emergency", "same_day_emergency", x),
+      sub("^ambulatory_emergency", "same_day_emergency", x)
     }),
     dplyr::across("interval", \(x) purrr::map(x, \(x) list(interval = x)))
   ) |>
