@@ -5,8 +5,10 @@ embed-resources: true
 minimal: true
 code-fold: true
 params:
-  inflation_years: 18
-  rds_filename: visualising_uncertainty_intervals
+  inflation_years: 20
+  create_rds_file: true
+  rds_filename: test
+  include_zero_mitigation: false
 ---
 
 ```{r}
@@ -207,13 +209,19 @@ intervals_list <- final_joined_table |>
     interval = purrr::map2(.data[["p10"]], .data[["p90"]], c),
     .keep = "unused"
   ) |>
-  dplyr::mutate(
-    dplyr::across("strategy", \(x) {
-      sub("^ambulatory_emergency", "same_day_emergency", x)
-    }),
-    dplyr::across("interval", \(x) purrr::map(x, \(x) list(interval = x)))
-  ) |>
-  tidyr::unite("scenario", c("source", "period")) |>
+  tidyr::unite("scenario", c("source", "period"))
+
+if (params[["include_zero_mitigation"]]) {
+  zero_mitigation_tbl <- tpma_data |>
+    dplyr::mutate(
+      dplyr::across("type", \(x) forcats::fct(x, c("ip", "op", "aae"))),
+      scenario = "zero_mitigation",
+      interval = purrr::map(nrow(tpma_data), \(x) list(interval = c(1L, 1L)))
+    )
+  scenario_data <- dplyr::bind_rows(scenario_data, zero_mitigation_tbl)
+}
+
+intervals_list <- scenario_data |>
   tidyr::nest(.by = "scenario") |>
   tibble::deframe()
 
