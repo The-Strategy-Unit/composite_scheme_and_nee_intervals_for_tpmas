@@ -4,6 +4,7 @@ lang: en-GB
 embed-resources: true
 minimal: true
 code-fold: true
+theme: lumen
 params:
   inflation_years: 20
   create_rds_file: true
@@ -16,14 +17,12 @@ params:
 source("functions.R")
 inflation_years <- as.integer(params[["inflation_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
-
 ```
 
 
 ```{r}
 #| label: get source data from Connect
 #| message: false
-
 pins_folder <- Sys.getenv("PINS_FOLDER")
 su_connect_pins_board <- pins::board_connect(auth = "envvar")
 
@@ -32,7 +31,6 @@ nhp_tagged_runs_meta <- su_connect_pins_board |>
 
 params_data_init <- su_connect_pins_board |>
   pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_params"))
-
 ```
 
 
@@ -46,7 +44,6 @@ nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
 
 ```{r}
 #| label: preferred runs
-
 run_stages <- c("final_report_ndg2", "final_report_ndg3", "final_report_ndg1")
 
 preferred_runs <- nhp_tagged_runs_meta |>
@@ -92,8 +89,8 @@ combined_intervals_tbl <- params_data |>
 
 
 ```{r}
-#| label: remove rows with inapplicable values
-
+#| label: remove inapplicable data rows
+# create data subset of values that have been agreed to be inapplicable
 remove_rows <- combined_intervals_tbl |>
   dplyr::select(c("run_label", "strategy")) |>
   dplyr::filter(
@@ -117,7 +114,6 @@ remove_rows <- combined_intervals_tbl |>
 tidy_intervals_tbl <- combined_intervals_tbl |>
   dplyr::anti_join(remove_rows, c("run_label", "strategy")) |>
   dplyr::filter(dplyr::if_all(c("p10", "p90"), \(x) dplyr::between(x, 0, 1)))
-
 ```
 
 ```{r}
@@ -150,7 +146,10 @@ annualised_nee_intervals <- nee_intervals |>
 
 scheme_mixtures_tbl <- annualised_intervals_tbl |>
   create_mixtures(c("type", "change_factor", "strategy"))
+```
 
+```{r}
+#| label: Take a p10 and a p90 value from each distribution (1 per strategy)
 scheme_intervals <- scheme_mixtures_tbl |>
   dplyr::mutate(
     p10 = purrr::map_dbl(.data[["mixture"]], \(m) m@q(p = 0.1)),
@@ -160,7 +159,7 @@ scheme_intervals <- scheme_mixtures_tbl |>
 ```
 
 ```{r}
-#| label: reinflate values
+#| label: reinflate annualised values to actual horizon distance
 
 init_joined_table <- list(scheme_intervals, annualised_nee_intervals) |>
   rlang::set_names(c("schemes", "nee")) |>
@@ -224,23 +223,10 @@ if (params[["include_zero_mitigation"]]) {
 intervals_list <- scenario_data |>
   tidyr::nest(.by = "scenario") |>
   tibble::deframe()
-
 ```
 
 ```{r}
 #| label: export data
-
+#| eval: !expr params[["create_rds_file"]]
 readr::write_rds(intervals_list, rds_fname)
-
-success <- file.exists(rds_fname) && tools::file_ext(rds_fname) == "rds"
-succ_msg <- glue::glue("File `{rds_fname}` has been created")
-
-```
-
-`r if (success) succ_msg`
-
-Names of tables in `intervals_list` (object saved to rds):
-
-```{r}
-names(intervals_list)
 ```
