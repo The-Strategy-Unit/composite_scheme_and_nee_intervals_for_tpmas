@@ -203,9 +203,11 @@ final_joined_table <- inflation_years |>
 ```{r}
 #| label: convert table to named list of intervals data tables
 
-intervals_list <- final_joined_table |>
+scenario_data <- final_joined_table |>
   dplyr::mutate(
-    interval = purrr::map2(.data[["p10"]], .data[["p90"]], c),
+    interval = purrr::map2(.data[["p10"]], .data[["p90"]], \(x, y) {
+      list(interval = c(x, y))
+    }),
     .keep = "unused"
   ) |>
   tidyr::unite("scenario", c("source", "period"))
