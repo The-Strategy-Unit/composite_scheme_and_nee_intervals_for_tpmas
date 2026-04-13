@@ -11,6 +11,7 @@ params:
 
 ```{r}
 #| label: setup
+source("functions.R")
 inflation_years <- as.integer(params[["inflation_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 
@@ -34,41 +35,11 @@ params_data_init <- su_connect_pins_board |>
 
 
 ```{r}
-#| label: get source data from Azure
-
-az_token <- azkit::get_auth_token()
-support_con_name <- Sys.getenv("AZ_SUPPORT_CONTAINER")
-
-tpma_lookup <- azkit::get_container(support_con_name, token = az_token) |>
-  azkit::read_azure_csv("mitigator-lookup.csv", col_types = "-ccc-----") |>
-  dplyr::rename(
-    change_factor = "mitigator_type",
-    strategy = "mitigator_variable",
-    strategy_name = "mitigator_name"
-  )
-
-nee_intervals <- azkit::get_container(support_con_name, token = az_token) |>
-  azkit::read_azure_rds("nee_table.rds", type = "none") |>
-  dplyr::rename_with(stringr::str_to_snake) |>
-  dplyr::select(
-    type = "strategy_type",
-    change_factor = "type",
-    strategy = "param_name",
-    p10 = "lower_ci",
-    p90 = "upper_ci"
-  ) |>
-  dplyr::mutate(
-    dplyr::across("type", \(x) {
-      dplyr::case_when(
-        grepl("^inpatient", x) ~ "ip",
-        grepl("^length of stay", x) ~ "ip",
-        grepl("^outpatient", x) ~ "op",
-        grepl("^A&E", x) ~ "aae",
-        .default = x
-      )
-    }),
-    dplyr::across(c("p10", "p90"), \(x) x / 100)
-  )
+#| label: get source data from GitHub and Azure
+#| message: false
+tpma_data <- get_tpma_data()
+nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
+  rename_amb_strategies_to_sdec()
 ```
 
 ```{r}
@@ -104,22 +75,6 @@ params_data_tbl_summary <- params_data |>
 
 ```{r}
 #| label: extract intervals
-
-create_intervals_tbl <- function(lst) {
-  lst |>
-    purrr::map_depth(2, \(x) list(x[["interval"]])) |>
-    purrr::imap(\(x, y) dplyr::bind_cols(type = y, tibble::as_tibble_row(x))) |>
-    purrr::list_rbind() |>
-    tidyr::pivot_longer(
-      !"type",
-      names_to = "strategy",
-      values_drop_na = TRUE
-    ) |>
-    tidyr::unnest_wider("value", names_sep = "_") |>
-    dplyr::rename(p10 = "value_1", p90 = "value_2")
-}
-
-
 combined_intervals_tbl <- params_data |>
   purrr::map(\(x) purrr::keep_at(x, c("activity_avoidance", "efficiencies"))) |>
   purrr::map_depth(2, create_intervals_tbl) |>
@@ -167,8 +122,6 @@ run_lookup <- params_data_tbl_summary |>
   dplyr::select(!"app_version") |>
   tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
 
-annualise <- \(x, p) `^`(x, (1 / p))
-
 annualised_intervals_tbl <- tidy_intervals_tbl |>
   dplyr::left_join(run_lookup, "run_label") |>
   dplyr::mutate(
@@ -186,29 +139,6 @@ annualised_nee_intervals <- nee_intervals |>
   dplyr::mutate(dplyr::across(c("p10", "p90"), \(x) annualise(x, nee_period)))
 ```
 
-
-```{r}
-#| label: create_mixtures function
-create_mixtures <- function(intervals_tbl, colnames_vec) {
-  intervals_tbl |>
-    dplyr::mutate(
-      mu = (.data[["p10"]] + .data[["p90"]]) / 2,
-      sigma = (.data[["p90"]] - .data[["mu"]]) /
-        qnorm(p = 0.90, mean = 0, sd = 1),
-      dplyr::across("sigma", \(x) dplyr::if_else(x == 0, 0.0001, x)),
-      dist = purrr::map2(.data[["mu"]], .data[["sigma"]], \(m, s) {
-        distr::Truncate(distr::Norm(mean = m, sd = s), lower = 0, upper = 1)
-      })
-    ) |>
-    dplyr::summarise(
-      mixture = purrr::map(list(.data[["dist"]]), \(l) {
-        distr::UnivarMixingDistribution(Dlist = l)
-      }),
-      .by = tidyselect::all_of(colnames_vec)
-    )
-}
-
-```
 
 ```{r}
 #| label: create mixtures across all scheme runs
@@ -231,10 +161,6 @@ scheme_intervals <- scheme_mixtures_tbl |>
 init_joined_table <- list(scheme_intervals, annualised_nee_intervals) |>
   rlang::set_names(c("schemes", "nee")) |>
   dplyr::bind_rows(.id = "source")
-
-reinflate_intervals <- function(exp, tbl) {
-  dplyr::mutate(tbl, dplyr::across(c("p10", "p90"), \(x) x^exp))
-}
 
 final_joined_table <- inflation_years |>
   purrr::map(\(x) reinflate_intervals(x, init_joined_table)) |>
