@@ -80,10 +80,12 @@ combined_intervals_tbl <- params_data |>
   purrr::map_depth(2, create_intervals_tbl) |>
   purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
   purrr::list_rbind(names_to = "run_label") |>
-  # only include "approved" list of strategies (excludes "bads_*"))
-  dplyr::inner_join(tpma_lookup, c("change_factor", "strategy")) |>
-  dplyr::relocate("strategy_name", .after = "strategy")
-
+  # Rename here, on the assumption that these strategies are synonymous.
+  # If we do not rename here, ambulatory_emergency* data will be lost as this
+  # label is not included in the current tmpa_data set (it's "inactive").
+  rename_amb_strategies_to_sdec() |>
+  # only include current approved set of strategies (excludes "bads_*"))
+  dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 
 
