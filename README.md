@@ -11,15 +11,60 @@ will generate a list of tables of data, each with the following columns:
 
 The list of tables will be written to an rds file in the current working
 directory.
+(This behaviour can be turned off by setting the `create_rds_file` parameter
+YAML config option to `false`).
 
-Before rendering the qmd file, set the params at the top of the file as follows:
+Before rendering the qmd file, set the params at the top of the file as desired:
 
 * `inflation_years` as an integer: the number of years of activity mitigation
   between the baseline and horizon. Multiple values can be handled using a YAML
   array, for example in the format `[10, 15]`
-* `rds_filename` as a string: the name of the rds file to be created.
+* `create_rds_file`: logical. `true` by default. Set to `false` to avoid
+  writing the list of data frames to an `rds` file
+* `rds_filename` as a string: the name of the rds file to create
+* include_zero_mitigation: logical, `false` by default. Whether to append to the
+  data list a table with all intervals set to `c(1, 1)` to the list. (That is,
+  data for a scenario with no mitigation applied across all TPMAs).
 
-### Preparation
+## Getting started
+
+Clone this repository to a local folder (or use GitHub's "download to zip"
+option and then unpack the file).
+
+### How to clone the repository
+
+Copy the URL from the "Code" button on the GitHub repo page to your clipboard.
+This may look like
+`https://github.com/The-Strategy-Unit/composite_scheme_and_nee_intervals_for_tpmas.git`.
+You can thn paste this in when your IDE asks for a URL, or you can pass it to
+`git clone` at the terminal.
+
+
+In RStudio you can use
+
+```
+File > New Project... Version Control...
+```
+
+In Positron or VSCode you can use
+
+```
+File > New Folder From Git...
+```
+
+Or <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> then `Git: Clone`.
+
+Once cloned or downloaded, you can open the
+`create_custom_intervals.qmd`
+file, edit the params section as necessary, then render the file.
+
+The file will generate an R list called `intervals_list`.
+You may wish to add further chunks to the qmd file to work with the list
+within the Quarto process (instead of exporting the rds and working with the
+data from there.)
+
+
+## Preparation
 
 You will need to have the following environment variables set, ideally via your
 local `.Renviron` file:
@@ -32,55 +77,20 @@ AZ_STORAGE_EP
 AZ_SUPPORT_CONTAINER
 ```
 
-Contact Fran Barton for details of these values.
+Contact Fran Barton for these values.
 
 Rendering `create_custom_intervals.qmd` requires the following R packages:
 
 * [azkit](https://github.com/The-Strategy-Unit/azkit)
-* dplyr
-* forcats
-* glue
-* purrr
-* readr
-* tibble
-* tidyr
+* from the tidyverse:
+  * dplyr
+  * forcats
+  * glue
+  * purrr
+  * readr
+  * rlang
+  * tibble
+  * tidyr
+* base64enc
 * distr
 * pins
-* rlang
-
-
-## Creating a table for a "zero mitigation" scenario
-
-Separately from the above, you may need to create a table where all the
-intervals are set to 1.
-This is equivalent to a "no mitigation", or "steady state", scenario.
-
-For this, render the
-`create_zero_mitigation_table.qmd`
-file.
-You may wish to edit the filename parameter at the top of the file first.
-
-This will create an `rds` file in your current directory.
-
-The data in the file will be in the form of an R list with a single element,
-named "zero_mitigation", which contains a data frame.
-
-### Preparation
-
-You will need to have the following environment variables set, ideally via your
-local `.Renviron` file:
-
-```
-AZ_STORAGE_EP
-AZ_SUPPORT_CONTAINER
-```
-
-Rendering `create_zero_mitigation_table.qmd` requires the following R packages:
-
-* [azkit](https://github.com/The-Strategy-Unit/azkit)
-* dplyr
-* forcats
-* glue
-* purrr
-* readr
-* tibble
