@@ -43,8 +43,12 @@ nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
 ```
 
 ```{r}
-#| label: preferred runs
-run_stages <- c("final_report_ndg2", "final_report_ndg3", "final_report_ndg1")
+#| label: preferred-runs
+# fmt: skip
+run_stages <- c(
+  "validation_report_ndg2", "validation_report_ndg3",
+  "final_report_ndg2", "final_report_ndg3"
+)
 
 preferred_runs <- nhp_tagged_runs_meta |>
   dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
