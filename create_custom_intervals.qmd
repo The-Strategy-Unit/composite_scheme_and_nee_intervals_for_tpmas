@@ -124,6 +124,23 @@ tidy_intervals_tbl <- combined_intervals_tbl |>
   dplyr::filter(dplyr::if_all(c("p10", "p90"), \(x) dplyr::between(x, 0, 1)))
 ```
 
+
+```{r}
+#| label: tpma-contributions-table
+version_lookup <- params_data_tbl_summary |>
+  tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
+tidy_intervals_tbl |>
+  dplyr::left_join(version_lookup, "run_label") |>
+  dplyr::summarise(
+    latest_version = max(.data[["app_version"]]),
+    schemes = dplyr::n(),
+    .by = "strategy"
+  ) |>
+  dplyr::arrange(dplyr::across("schemes", dplyr::desc)) |>
+  gt::gt() |>
+  gt::tab_header("Number of schemes providing intervals for each TPMA")
+```
+
 ```{r}
 #| label: annualise-scheme-intervals
 run_lookup <- params_data_tbl_summary |>
