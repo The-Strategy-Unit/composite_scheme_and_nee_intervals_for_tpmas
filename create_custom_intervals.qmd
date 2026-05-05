@@ -6,7 +6,7 @@ minimal: true
 code-fold: true
 theme: lumen
 params:
-  inflation_years: 20
+  horizon_years: 18
   create_rds_file: true
   rds_filename: test
   include_zero_mitigation: false
@@ -15,7 +15,7 @@ params:
 ```{r}
 #| label: setup
 source("functions.R")
-inflation_years <- as.integer(params[["inflation_years"]])
+horizon_years <- as.integer(params[["horizon_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 ```
 
@@ -23,8 +23,8 @@ rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 ```{r}
 #| label: connect-data
 #| message: false
-pins_folder <- Sys.getenv("PINS_FOLDER")
 su_connect_pins_board <- pins::board_connect(auth = "envvar")
+pins_folder <- Sys.getenv("PINS_FOLDER")
 
 nhp_tagged_runs_meta <- su_connect_pins_board |>
   pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_meta"))
@@ -171,9 +171,9 @@ init_joined_table <- list(scheme_intervals, annualised_nee_intervals) |>
   rlang::set_names(c("schemes", "nee")) |>
   dplyr::bind_rows(.id = "source")
 
-final_joined_table <- inflation_years |>
+final_joined_table <- horizon_years |>
   purrr::map(\(x) reinflate_intervals(x, init_joined_table)) |>
-  rlang::set_names(paste0(inflation_years, "yr")) |>
+  rlang::set_names(paste0(horizon_years, "yr")) |>
   purrr::list_rbind(names_to = "period") |>
   # pivot_wider creates NA values in the table, where we are missing a NEE value
   tidyr::pivot_wider(

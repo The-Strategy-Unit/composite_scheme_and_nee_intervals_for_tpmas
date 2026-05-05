@@ -16,7 +16,7 @@ YAML config option to `false`).
 
 Before rendering the qmd file, set the params at the top of the file as desired:
 
-* `inflation_years` as an integer: the number of years of activity mitigation
+* `horizon_years` as an integer: the number of years of activity mitigation
   between the baseline and horizon. Multiple values can be handled using a YAML
   array, for example in the format `[10, 15]`
 * `create_rds_file`: logical. `true` by default. Set to `false` to avoid
@@ -36,7 +36,7 @@ option and then unpack the file).
 Copy the URL from the "Code" button on the GitHub repo page to your clipboard.
 This may look like
 `https://github.com/The-Strategy-Unit/composite_scheme_and_nee_intervals_for_tpmas.git`.
-You can thn paste this in when your IDE asks for a URL, or you can pass it to
+You can then paste this in when your IDE asks for a URL, or you can pass it to
 `git clone` at the terminal.
 
 
@@ -66,8 +66,8 @@ data from there.)
 
 ## Preparation
 
-You will need to have the following environment variables set, ideally via your
-local `.Renviron` file:
+You will need to have the following environment variables set, ideally via an
+`.Renviron` file:
 
 ```
 CONNECT_SERVER
@@ -77,7 +77,7 @@ AZ_STORAGE_EP
 AZ_SUPPORT_CONTAINER
 ```
 
-Contact Fran Barton for these values.
+Contact a member of the Data Science team for these values.
 
 Rendering `create_custom_intervals.qmd` requires the following R packages:
 
