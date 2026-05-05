@@ -74,7 +74,11 @@ params_data_tbl_summary <- params_data |>
   purrr::map(tibble::as_tibble_row) |>
   purrr::list_rbind() |>
   dplyr::mutate(dplyr::across(tidyselect::ends_with("year"), as.integer))
+
+n_schemes_included <- nrow(params_data_tbl_summary)
 ```
+
+Number of schemes with runs included in dataset: `r n_schemes_included`
 
 ```{r}
 #| label: interval-extraction
