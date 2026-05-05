@@ -21,7 +21,7 @@ rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 
 
 ```{r}
-#| label: get source data from Connect
+#| label: connect-data
 #| message: false
 pins_folder <- Sys.getenv("PINS_FOLDER")
 su_connect_pins_board <- pins::board_connect(auth = "envvar")
@@ -35,7 +35,7 @@ params_data_init <- su_connect_pins_board |>
 
 
 ```{r}
-#| label: get source data from GitHub and Azure
+#| label: gh-azure-data
 #| message: false
 tpma_data <- get_tpma_data()
 nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
@@ -77,7 +77,7 @@ params_data_tbl_summary <- params_data |>
 ```
 
 ```{r}
-#| label: extract intervals
+#| label: interval-extraction
 combined_intervals_tbl <- params_data |>
   purrr::map(\(x) purrr::keep_at(x, c("activity_avoidance", "efficiencies"))) |>
   purrr::map_depth(2, create_intervals_tbl) |>
@@ -93,7 +93,7 @@ combined_intervals_tbl <- params_data |>
 
 
 ```{r}
-#| label: remove inapplicable data rows
+#| label: remove-inapplicable-rows
 # create data subset of values that have been agreed to be inapplicable
 remove_rows <- combined_intervals_tbl |>
   dplyr::select(c("run_label", "strategy")) |>
@@ -121,7 +121,7 @@ tidy_intervals_tbl <- combined_intervals_tbl |>
 ```
 
 ```{r}
-#| label: annualise scheme intervals
+#| label: annualise-scheme-intervals
 run_lookup <- params_data_tbl_summary |>
   dplyr::select(!"app_version") |>
   tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
@@ -145,15 +145,14 @@ annualised_nee_intervals <- nee_intervals |>
 
 
 ```{r}
-#| label: create mixtures across all scheme runs
+#| label: create-mixtures-across-schemes
 #| warning: false
-
 scheme_mixtures_tbl <- annualised_intervals_tbl |>
   create_mixtures(c("type", "change_factor", "strategy"))
 ```
 
 ```{r}
-#| label: Take a p10 and a p90 value from each distribution (1 per strategy)
+#| label: pluck-intervals-from-mixtures
 scheme_intervals <- scheme_mixtures_tbl |>
   dplyr::mutate(
     p10 = purrr::map_dbl(.data[["mixture"]], \(m) m@q(p = 0.1)),
@@ -163,8 +162,7 @@ scheme_intervals <- scheme_mixtures_tbl |>
 ```
 
 ```{r}
-#| label: reinflate annualised values to actual horizon distance
-
+#| label: annualised-value-reinflation
 init_joined_table <- list(scheme_intervals, annualised_nee_intervals) |>
   rlang::set_names(c("schemes", "nee")) |>
   dplyr::bind_rows(.id = "source")
@@ -205,8 +203,7 @@ final_joined_table <- inflation_years |>
 ```
 
 ```{r}
-#| label: convert table to named list of intervals data tables
-
+#| label: convert-table-to-named-list
 scenario_data <- final_joined_table |>
   dplyr::mutate(
     interval = purrr::map2(.data[["p10"]], .data[["p90"]], \(x, y) {
@@ -232,7 +229,7 @@ intervals_list <- scenario_data |>
 ```
 
 ```{r}
-#| label: export data
+#| label: data-export
 #| eval: !expr params[["create_rds_file"]]
 readr::write_rds(intervals_list, rds_fname)
 ```
