@@ -93,4 +93,6 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
   * tidyr
 * base64enc
 * distr
+* gt
+* httr2
 * pins
