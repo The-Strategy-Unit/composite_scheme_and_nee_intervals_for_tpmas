@@ -1,0 +1,63 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"projectColors.mainColor": "#34cb0b",
+		"window.title": "composite scheme intervals",
+		"workbench.colorCustomizations": {
+			"editorRuler.foreground": "#ff4081",
+			"statusBarItem.warningBackground": "#34cb0b",
+			"statusBarItem.warningForeground": "#000000",
+			"statusBarItem.warningHoverBackground": "#34cb0b",
+			"statusBarItem.warningHoverForeground": "#00000090",
+			"statusBarItem.remoteBackground": "#41d818",
+			"statusBarItem.remoteForeground": "#000000",
+			"statusBarItem.remoteHoverBackground": "#4ee525",
+			"statusBarItem.remoteHoverForeground": "#00000090",
+			"statusBar.background": "#34cb0b",
+			"statusBar.foreground": "#000000",
+			"statusBar.border": "#34cb0b",
+			"statusBar.debuggingBackground": "#34cb0b",
+			"statusBar.debuggingForeground": "#000000",
+			"statusBar.debuggingBorder": "#34cb0b",
+			"statusBar.noFolderBackground": "#34cb0b",
+			"statusBar.noFolderForeground": "#000000",
+			"statusBar.noFolderBorder": "#34cb0b",
+			"statusBar.prominentBackground": "#34cb0b",
+			"statusBar.prominentForeground": "#000000",
+			"statusBar.prominentHoverBackground": "#34cb0b",
+			"statusBar.prominentHoverForeground": "#00000090",
+			"focusBorder": "#34cb0b99",
+			"progressBar.background": "#34cb0b",
+			"textLink.foreground": "#74ff4b",
+			"textLink.activeForeground": "#81ff58",
+			"selection.background": "#27be00",
+			"list.highlightForeground": "#34cb0b",
+			"list.focusAndSelectionOutline": "#34cb0b99",
+			"button.background": "#34cb0b",
+			"button.foreground": "#000000",
+			"button.hoverBackground": "#41d818",
+			"tab.activeBorderTop": "#41d818",
+			"pickerGroup.foreground": "#41d818",
+			"list.activeSelectionBackground": "#34cb0b4d",
+			"panelTitle.activeBorder": "#41d818",
+			"activityBar.activeBorder": "#34cb0b",
+			"activityBarBadge.foreground": "#000000",
+			"activityBarBadge.background": "#34cb0b",
+			"titleBar.activeBackground": "#34cb0b",
+			"titleBar.activeForeground": "#000000",
+			"titleBar.inactiveBackground": "#34cb0b",
+			"titleBar.inactiveForeground": "#00000090"
+		},
+		"projectColors.name": "composite scheme intervals",
+		"projectColors.isActivityBarColored": false,
+		"projectColors.isTitleBarColored": true,
+		"projectColors.isStatusBarColored": true,
+		"projectColors.isProjectNameColored": true,
+		"projectColors.isActiveItemsColored": true,
+		"projectColors.setWindowTitle": true
+	}
+}

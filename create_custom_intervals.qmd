@@ -8,7 +8,7 @@ theme: lumen
 params:
   horizon_years: 18
   create_rds_file: true
-  rds_filename: test
+  rds_filename: example
   include_zero_mitigation: false
 ---
 
