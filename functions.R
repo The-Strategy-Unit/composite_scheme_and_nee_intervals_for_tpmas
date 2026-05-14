@@ -22,12 +22,6 @@ get_tpma_data <- function() {
 }
 
 
-rename_amb_strategies_to_sdec <- function(dat) {
-  rename_to_sdec <- \(x) sub("^ambulatory_emergency", "same_day_emergency", x)
-  dplyr::mutate(dat, dplyr::across("strategy", rename_to_sdec))
-}
-
-
 get_nee_intervals <- function(support_cont_name) {
   az_token <- azkit::get_auth_token()
   support_container <- azkit::get_container(support_cont_name, token = az_token)
