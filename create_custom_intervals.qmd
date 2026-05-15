@@ -8,7 +8,7 @@ theme: lumen
 params:
   horizon_years: 18
   create_rds_file: true
-  rds_filename: test
+  rds_filename: example
   include_zero_mitigation: false
 ---
 
@@ -39,7 +39,8 @@ params_data_init <- su_connect_pins_board |>
 #| message: false
 tpma_data <- get_tpma_data()
 nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
-  rename_amb_strategies_to_sdec()
+  # only include current approved set of strategies
+  dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 
 ```{r}
@@ -87,11 +88,7 @@ combined_intervals_tbl <- params_data |>
   purrr::map_depth(2, create_intervals_tbl) |>
   purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
   purrr::list_rbind(names_to = "run_label") |>
-  # Rename here, on the assumption that these strategies are synonymous.
-  # If we do not rename here, ambulatory_emergency* data will be lost as this
-  # label is not included in the current tmpa_data set (it's "inactive").
-  rename_amb_strategies_to_sdec() |>
-  # only include current approved set of strategies (excludes "bads_*"))
+  # only include current approved set of strategies
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 

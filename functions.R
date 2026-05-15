@@ -13,18 +13,13 @@ get_tpma_data <- function() {
     purrr::pluck("content") |>
     base64enc::base64decode() |>
     readr::read_csv(col_types = "ccc-----c") |>
-    dplyr::filter(is.na(.data[["active_to"]])) |>
+    # only keep currently active TPMAs
+    dplyr::filter(dplyr::if_any("active_to", is.na)) |>
     dplyr::select(
       type = "activity_type",
       change_factor = "mitigator_type",
       strategy = "mitigator_variable"
     )
-}
-
-
-rename_amb_strategies_to_sdec <- function(dat) {
-  rename_to_sdec <- \(x) sub("^ambulatory_emergency", "same_day_emergency", x)
-  dplyr::mutate(dat, dplyr::across("strategy", rename_to_sdec))
 }
 
 
