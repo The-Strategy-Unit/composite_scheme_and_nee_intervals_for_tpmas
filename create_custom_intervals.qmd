@@ -113,7 +113,11 @@ remove_rows <- combined_intervals_tbl |>
             "virtual_wards_efficiencies_ari",
             "raid_ip",
             "virtual_wards_efficiencies_heart_failure"
-          ))
+          )) |
+      (grepl("^RBT", .data[["run_label"]]) &
+        grepl("^same_day_emergency_care_.*high$", .data[["strategy"]])) |
+      (grepl("^RCX", .data[["run_label"]]) &
+        .data[["strategy"]] == "same_day_emergency_care_low")
   )
 
 tidy_intervals_tbl <- combined_intervals_tbl |>
