@@ -19,18 +19,9 @@ horizon_years <- as.integer(params[["horizon_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
 ```
 
-
 ```{r}
-#| label: connect-data
-#| message: false
-su_connect_pins_board <- pins::board_connect(auth = "envvar")
-pins_folder <- Sys.getenv("PINS_FOLDER")
-
-nhp_tagged_runs_meta <- su_connect_pins_board |>
-  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_meta"))
-
-params_data_init <- su_connect_pins_board |>
-  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_params"))
+#| label: github-tpma-data
+tpma_data <- get_tpma_data()
 ```
 
 ```{r}
