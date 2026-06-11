@@ -78,11 +78,10 @@ You will need to have the following environment variables set, ideally via an
 `.Renviron` file:
 
 ```
-CONNECT_SERVER
-CONNECT_API_KEY
-PINS_FOLDER
 AZ_STORAGE_EP
+AZ_TABLE_EP
 AZ_SUPPORT_CONTAINER
+AZ_RESULTS_CONTAINER
 ```
 
 Contact a member of the Data Science team for these values.
@@ -93,7 +92,6 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
 * from the tidyverse:
   * dplyr
   * forcats
-  * glue
   * purrr
   * readr
   * rlang
@@ -103,4 +101,3 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
 * distr
 * gt
 * httr2
-* pins
