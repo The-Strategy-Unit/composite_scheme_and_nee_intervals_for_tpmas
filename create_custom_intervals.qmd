@@ -17,6 +17,7 @@ params:
 source("functions.R")
 horizon_years <- as.integer(params[["horizon_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
+token <- azkit::get_auth_token()
 ```
 
 ```{r}
@@ -26,12 +27,10 @@ tpma_data <- get_tpma_data()
 
 ```{r}
 #| label: azure-modelruns-data
-token <- azkit::get_auth_token()
-
 # fmt: skip
 table_cols <- c(
-  "dataset", "scenario", "aggregated_results_path", "start_year", "end_year",
-  "app_version", "run_stage"
+  "dataset", "scenario", "start_year", "end_year", "app_version", "run_stage",
+  "aggregated_results_path", "results_json_gz_path"
 )
 
 # fmt: skip
@@ -54,10 +53,8 @@ n_schemes_included <- nrow(runs_table)
 Number of schemes with runs included in dataset: `r n_schemes_included`
 
 ```{r}
-#| label: gh-azure-data
-#| message: false
-tpma_data <- get_tpma_data()
-nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
+#| label: azure-nee-data
+nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER"), token) |>
   # only include current approved set of strategies
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
@@ -65,11 +62,20 @@ nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
 
 ```{r}
 #| label: interval-extraction
-combined_intervals_tbl <- params_data |>
+combined_intervals_tbl <- runs_table |>
+  dplyr::mutate(
+    results_path = dplyr::coalesce(
+      .data[["aggregated_results_path"]],
+      .data[["results_json_gz_path"]]
+    )
+  ) |>
+  dplyr::select(c("dataset", "results_path")) |>
+  tibble::deframe() |>
+  purrr::map(\(x) read_params(x, Sys.getenv("AZ_RESULTS_CONTAINER"), token)) |>
   purrr::map(\(x) purrr::keep_at(x, c("activity_avoidance", "efficiencies"))) |>
   purrr::map_depth(2, create_intervals_tbl) |>
   purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
-  purrr::list_rbind(names_to = "run_label") |>
+  purrr::list_rbind(names_to = "dataset") |>
   # only include current approved set of strategies
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
