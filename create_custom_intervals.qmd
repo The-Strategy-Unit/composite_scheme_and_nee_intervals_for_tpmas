@@ -6,7 +6,7 @@ minimal: true
 code-fold: true
 theme: lumen
 params:
-  horizon_years: 18
+  horizon_years: 20
   create_rds_file: true
   rds_filename: example
   include_zero_mitigation: false
@@ -33,6 +33,34 @@ params_data_init <- su_connect_pins_board |>
   pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_params"))
 ```
 
+```{r}
+#| label: azure-modelruns-data
+token <- azkit::get_auth_token()
+
+# fmt: skip
+table_cols <- c(
+  "dataset", "scenario", "aggregated_results_path", "start_year", "end_year",
+  "app_version", "run_stage"
+)
+
+# fmt: skip
+run_stages <- c(
+  "validation_report_ndg2", "validation_report_ndg3",
+  "final_report_ndg2", "final_report_ndg3"
+)
+
+runs_table <- azkit::read_azure_table("modelruns", token = token) |>
+  dplyr::select(tidyselect::all_of(table_cols)) |>
+  dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
+  dplyr::slice_min(
+    match(.data[["run_stage"]], {{ run_stages }}),
+    by = "dataset"
+  )
+
+n_schemes_included <- nrow(runs_table)
+```
+
+Number of schemes with runs included in dataset: `r n_schemes_included`
 
 ```{r}
 #| label: gh-azure-data
@@ -43,43 +71,6 @@ nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 
-```{r}
-#| label: preferred-runs
-# fmt: skip
-run_stages <- c(
-  "validation_report_ndg2", "validation_report_ndg3",
-  "final_report_ndg2", "final_report_ndg3"
-)
-
-preferred_runs <- nhp_tagged_runs_meta |>
-  dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
-  dplyr::slice_min(
-    match(.data[["run_stage"]], {{ run_stages }}),
-    by = "dataset"
-  ) |>
-  dplyr::select(!"file")
-
-preferred_run_names <- preferred_runs |>
-  glue::glue_data("{dataset}_{scenario}_{create_datetime}")
-
-params_data <- params_data_init |>
-  purrr::keep_at(preferred_run_names)
-
-# fmt: skip
-core_elements <- c(
-  "dataset", "scenario", "start_year",
-  "end_year", "app_version", "create_datetime"
-)
-params_data_tbl_summary <- params_data |>
-  purrr::map(\(x) purrr::keep_at(x, core_elements)) |>
-  purrr::map(tibble::as_tibble_row) |>
-  purrr::list_rbind() |>
-  dplyr::mutate(dplyr::across(tidyselect::ends_with("year"), as.integer))
-
-n_schemes_included <- nrow(params_data_tbl_summary)
-```
-
-Number of schemes with runs included in dataset: `r n_schemes_included`
 
 ```{r}
 #| label: interval-extraction
