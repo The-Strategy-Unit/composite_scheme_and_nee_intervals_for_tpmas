@@ -23,7 +23,7 @@ get_tpma_data <- function() {
 }
 
 
-read_params <- function(path, container_name, token = azkit::get_auth_token()) {
+read_params <- function(path, container_name, token) {
   container <- azkit::get_container(container_name, token = token)
   if (grepl("json.gz$", path)) {
     azkit::read_azure_jsongz(container, path, obj_of_arrs_to_df = FALSE) |>
@@ -35,10 +35,8 @@ read_params <- function(path, container_name, token = azkit::get_auth_token()) {
 }
 
 
-get_nee_intervals <- function(support_cont_name) {
-  az_token <- azkit::get_auth_token()
-  support_container <- azkit::get_container(support_cont_name, token = az_token)
-
+get_nee_intervals <- function(support_cont_name, token) {
+  support_container <- azkit::get_container(support_cont_name, token = token)
   support_container |>
     azkit::read_azure_rds("nee_table.rds", type = "none") |>
     dplyr::rename_with(stringr::str_to_snake) |>
