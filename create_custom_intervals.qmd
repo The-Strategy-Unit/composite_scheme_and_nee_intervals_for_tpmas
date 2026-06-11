@@ -238,3 +238,40 @@ intervals_list <- scenario_data |>
 #| eval: !expr params[["create_rds_file"]]
 readr::write_rds(intervals_list, rds_fname)
 ```
+
+```{r}
+#| label: generate-params
+#| eval: false
+model_version <- "v5.1"
+config_file <- modparams::get_config_filepath(model_version)
+seed <- 1598L
+
+intervals_tbl <- intervals_list |>
+  dplyr::bind_rows(.id = "scenario") |>
+  tidyr::nest(.by = "scenario", .key = "intervals_data")
+
+if (params[["include_zero_mitigation"]]) {
+  scenario_labels <- c("NEE", "composite", "zero")
+} else {
+  scenario_labels <- c("NEE", "composite")
+}
+l <- length(scenario_labels)
+ndg_variants <- rep(c(2, 3), each = l)
+s <- paste0("-", rep(scenario_labels, times = l))
+scenarios <- paste0(Sys.Date(), "-National-NDG", ndg_variants, s)
+
+setup_tbl <- dplyr::bind_rows(intervals_tbl, intervals_tbl) |>
+  dplyr::mutate(
+    config = config_file,
+    scenario = scenarios,
+    dataset = "national",
+    user = "nhp.devs",
+    seed = seed,
+    end_year = 2043L,
+    model_runs = 512L,
+    ndg_variant = paste0("ndg", ndg_variants)
+  )
+
+files_out <- purrr::pmap_chr(setup_tbl, modparams::write_params_json)
+modparams::validate_files(files_out, model_version)
+```
