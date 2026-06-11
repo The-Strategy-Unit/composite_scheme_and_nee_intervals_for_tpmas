@@ -85,16 +85,16 @@ combined_intervals_tbl <- runs_table |>
 #| label: remove-inapplicable-rows
 # create data subset of values that have been agreed to be inapplicable
 remove_rows <- combined_intervals_tbl |>
-  dplyr::select(c("run_label", "strategy")) |>
+  dplyr::select(c("dataset", "strategy")) |>
   dplyr::filter(
-    (grepl("^RH5", .data[["run_label"]]) &
+    (.data[["dataset"]] == "RH5" &
       .data[["strategy"]] == "virtual_wards_activity_avoidance_ari") |
-      (grepl("^RAS", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RAS" &
         (grepl("adult_non-surgical$", .data[["strategy"]]) |
           .data[["strategy"]] == "pre-op_los_1-day")) |
-      (grepl("^RGN", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RGN" &
         grepl("^discharged_no_treatment_.*_ambulance$", .data[["strategy"]])) |
-      (grepl("^RTX", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RTX" &
         .data[["strategy"]] %in%
           c(
             "stroke_early_supported_discharge",
@@ -102,14 +102,14 @@ remove_rows <- combined_intervals_tbl |>
             "raid_ip",
             "virtual_wards_efficiencies_heart_failure"
           )) |
-      (grepl("^RBT", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RBT" &
         grepl("^same_day_emergency_care_.*high$", .data[["strategy"]])) |
-      (grepl("^RCX", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RCX" &
         .data[["strategy"]] == "same_day_emergency_care_low")
   )
 
 tidy_intervals_tbl <- combined_intervals_tbl |>
-  dplyr::anti_join(remove_rows, c("run_label", "strategy")) |>
+  dplyr::anti_join(remove_rows, c("dataset", "strategy")) |>
   dplyr::filter(dplyr::if_all(c("p10", "p90"), \(x) dplyr::between(x, 0, 1)))
 ```
 
