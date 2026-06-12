@@ -6,7 +6,7 @@ minimal: true
 code-fold: true
 theme: lumen
 params:
-  horizon_years: 18
+  horizon_years: 20
   create_rds_file: true
   rds_filename: example
   include_zero_mitigation: false
@@ -17,77 +17,65 @@ params:
 source("functions.R")
 horizon_years <- as.integer(params[["horizon_years"]])
 rds_fname <- sub("(\\.rds)+$", ".rds", paste0(params[["rds_filename"]], ".rds"))
+token <- azkit::get_auth_token()
 ```
 
-
 ```{r}
-#| label: connect-data
-#| message: false
-su_connect_pins_board <- pins::board_connect(auth = "envvar")
-pins_folder <- Sys.getenv("PINS_FOLDER")
-
-nhp_tagged_runs_meta <- su_connect_pins_board |>
-  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_meta"))
-
-params_data_init <- su_connect_pins_board |>
-  pins::pin_read(file.path(pins_folder, "nhp_tagged_runs_params"))
-```
-
-
-```{r}
-#| label: gh-azure-data
-#| message: false
+#| label: github-tpma-data
 tpma_data <- get_tpma_data()
-nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER")) |>
-  # only include current approved set of strategies
-  dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 
 ```{r}
-#| label: preferred-runs
+#| label: azure-modelruns-data
+# fmt: skip
+table_cols <- c(
+  "dataset", "scenario", "start_year", "end_year", "app_version", "run_stage",
+  "aggregated_results_path", "results_json_gz_path"
+)
+
 # fmt: skip
 run_stages <- c(
   "validation_report_ndg2", "validation_report_ndg3",
   "final_report_ndg2", "final_report_ndg3"
 )
 
-preferred_runs <- nhp_tagged_runs_meta |>
+runs_table <- azkit::read_azure_table("modelruns", token = token) |>
+  dplyr::select(tidyselect::all_of(table_cols)) |>
   dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
   dplyr::slice_min(
     match(.data[["run_stage"]], {{ run_stages }}),
     by = "dataset"
-  ) |>
-  dplyr::select(!"file")
+  )
 
-preferred_run_names <- preferred_runs |>
-  glue::glue_data("{dataset}_{scenario}_{create_datetime}")
-
-params_data <- params_data_init |>
-  purrr::keep_at(preferred_run_names)
-
-# fmt: skip
-core_elements <- c(
-  "dataset", "scenario", "start_year",
-  "end_year", "app_version", "create_datetime"
-)
-params_data_tbl_summary <- params_data |>
-  purrr::map(\(x) purrr::keep_at(x, core_elements)) |>
-  purrr::map(tibble::as_tibble_row) |>
-  purrr::list_rbind() |>
-  dplyr::mutate(dplyr::across(tidyselect::ends_with("year"), as.integer))
-
-n_schemes_included <- nrow(params_data_tbl_summary)
+n_schemes_included <- nrow(runs_table)
 ```
 
 Number of schemes with runs included in dataset: `r n_schemes_included`
 
 ```{r}
+#| label: azure-nee-data
+nee_intervals <- get_nee_intervals(Sys.getenv("AZ_SUPPORT_CONTAINER"), token) |>
+  # only include current approved set of strategies
+  dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
+```
+
+
+```{r}
 #| label: interval-extraction
-combined_intervals_tbl <- params_data |>
+combined_intervals_tbl <- runs_table |>
+  dplyr::mutate(
+    results_path = dplyr::coalesce(
+      .data[["aggregated_results_path"]],
+      .data[["results_json_gz_path"]]
+    )
+  ) |>
+  dplyr::select(c("dataset", "results_path")) |>
+  tibble::deframe() |>
+  purrr::map(\(x) read_params(x, Sys.getenv("AZ_RESULTS_CONTAINER"), token)) |>
   purrr::map(\(x) purrr::keep_at(x, c("activity_avoidance", "efficiencies"))) |>
   purrr::map_depth(2, create_intervals_tbl) |>
   purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
-  purrr::list_rbind(names_to = "run_label") |>
+  purrr::list_rbind(names_to = "dataset") |>
   # only include current approved set of strategies
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
@@ -97,16 +85,16 @@ combined_intervals_tbl <- params_data |>
 #| label: remove-inapplicable-rows
 # create data subset of values that have been agreed to be inapplicable
 remove_rows <- combined_intervals_tbl |>
-  dplyr::select(c("run_label", "strategy")) |>
+  dplyr::select(c("dataset", "strategy")) |>
   dplyr::filter(
-    (grepl("^RH5", .data[["run_label"]]) &
+    (.data[["dataset"]] == "RH5" &
       .data[["strategy"]] == "virtual_wards_activity_avoidance_ari") |
-      (grepl("^RAS", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RAS" &
         (grepl("adult_non-surgical$", .data[["strategy"]]) |
           .data[["strategy"]] == "pre-op_los_1-day")) |
-      (grepl("^RGN", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RGN" &
         grepl("^discharged_no_treatment_.*_ambulance$", .data[["strategy"]])) |
-      (grepl("^RTX", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RTX" &
         .data[["strategy"]] %in%
           c(
             "stroke_early_supported_discharge",
@@ -114,42 +102,37 @@ remove_rows <- combined_intervals_tbl |>
             "raid_ip",
             "virtual_wards_efficiencies_heart_failure"
           )) |
-      (grepl("^RBT", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RBT" &
         grepl("^same_day_emergency_care_.*high$", .data[["strategy"]])) |
-      (grepl("^RCX", .data[["run_label"]]) &
+      (.data[["dataset"]] == "RCX" &
         .data[["strategy"]] == "same_day_emergency_care_low")
   )
 
 tidy_intervals_tbl <- combined_intervals_tbl |>
-  dplyr::anti_join(remove_rows, c("run_label", "strategy")) |>
+  dplyr::anti_join(remove_rows, c("dataset", "strategy")) |>
   dplyr::filter(dplyr::if_all(c("p10", "p90"), \(x) dplyr::between(x, 0, 1)))
 ```
 
 
 ```{r}
 #| label: tpma-contributions-table
-version_lookup <- params_data_tbl_summary |>
-  tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
 tidy_intervals_tbl |>
-  dplyr::left_join(version_lookup, "run_label") |>
-  dplyr::summarise(
-    latest_version = max(.data[["app_version"]]),
-    schemes = dplyr::n(),
-    .by = "strategy"
-  ) |>
-  dplyr::arrange(dplyr::across("schemes", dplyr::desc)) |>
+  dplyr::rename(TPMA = "strategy") |>
+  dplyr::count(.data[["TPMA"]], sort = TRUE, name = "schemes") |>
   gt::gt() |>
-  gt::tab_header("Number of schemes providing intervals for each TPMA")
+  gt::tab_header("Number of schemes providing valid intervals for each TPMA")
 ```
 
 ```{r}
 #| label: annualise-scheme-intervals
-run_lookup <- params_data_tbl_summary |>
-  dplyr::select(!"app_version") |>
-  tidyr::unite(run_label, c("dataset", "scenario", "create_datetime"))
-
+# fmt: skip
+remove_cols <- c(
+  "dataset", "scenario", "app_version", "run_stage",
+  "aggregated_results_path", "results_json_gz_path"
+)
 annualised_intervals_tbl <- tidy_intervals_tbl |>
-  dplyr::left_join(run_lookup, "run_label") |>
+  dplyr::left_join(runs_table, "dataset") |>
+  dplyr::select(!tidyselect::all_of(remove_cols)) |>
   dplyr::mutate(
     period = .data[["end_year"]] - .data[["start_year"]],
     .keep = "unused"
@@ -170,7 +153,7 @@ annualised_nee_intervals <- nee_intervals |>
 #| label: create-mixtures-across-schemes
 #| warning: false
 scheme_mixtures_tbl <- annualised_intervals_tbl |>
-  create_mixtures(c("type", "change_factor", "strategy"))
+  create_mixtures(c("change_factor", "type", "strategy"))
 ```
 
 ```{r}

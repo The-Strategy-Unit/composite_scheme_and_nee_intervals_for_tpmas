@@ -60,9 +60,9 @@ Before rendering, set the params at the top of the file as desired:
 - `create_rds_file`: logical, `true` by default. Set to `false` to prevent
   writing the list of data frames to an `rds` file
 - `rds_filename` as a string: the name of the rds file to create
-- include_zero_mitigation: logical, `false` by default. Whether to append to the
-  data list a table with all intervals set to `c(1, 1)` to the list. (That is,
-  data for a scenario with no mitigation applied across all TPMAs).
+- `include_zero_mitigation`: logical, `false` by default. Whether to append to
+  the data list a table with all intervals set to `c(1, 1)` to the list. (That
+  is, data for a scenario with no mitigation applied across all TPMAs).
 
 The qmd file ends by internally generating an R list called `intervals_list`.
 This is the list of tables that (by default) gets exported to the rds file.
@@ -78,11 +78,10 @@ You will need to have the following environment variables set, ideally via an
 `.Renviron` file:
 
 ```
-CONNECT_SERVER
-CONNECT_API_KEY
-PINS_FOLDER
 AZ_STORAGE_EP
+AZ_TABLE_EP
 AZ_SUPPORT_CONTAINER
+AZ_RESULTS_CONTAINER
 ```
 
 Contact a member of the Data Science team for these values.
@@ -93,7 +92,6 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
 * from the tidyverse:
   * dplyr
   * forcats
-  * glue
   * purrr
   * readr
   * rlang
@@ -103,4 +101,3 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
 * distr
 * gt
 * httr2
-* pins
