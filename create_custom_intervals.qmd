@@ -7,9 +7,9 @@ code-fold: true
 theme: lumen
 params:
   horizon_years: 20
-  create_rds_file: true
+  create_rds_file: false
   rds_filename: example
-  include_zero_mitigation: false
+  include_zero_mitigation: true
 ---
 
 ```{r}
@@ -237,4 +237,46 @@ intervals_list <- scenario_data |>
 #| label: data-export
 #| eval: !expr params[["create_rds_file"]]
 readr::write_rds(intervals_list, rds_fname)
+```
+
+```{r}
+#| label: generate-params
+#| eval: true
+model_version <- "v5.2"
+config_file <- modparams::get_config_filepath(model_version)
+
+intervals_tbl <- intervals_list |>
+  dplyr::bind_rows(.id = "scenario") |>
+  tidyr::nest(.by = "scenario", .key = "intervals_data")
+
+if (params[["include_zero_mitigation"]]) {
+  # CSP = Composite Schemes Params
+  # ZMS = Zero Mitigation Scenario
+  params_types <- c("NEE", "CSP", "ZMS")
+} else {
+  params_types <- c("NEE", "CSP")
+}
+l <- length(params_types)
+ndg_variants <- rep(c(2, 3), each = l)
+# assumes that we have 2 NDG variants in play
+s <- paste0("-", rep(params_types, times = 2))
+ds <- gsub("-", "", Sys.Date())
+scenarios <- paste0(ds, "-NDG", ndg_variants, "-guideline", s)
+
+# assumes that we have 2 NDG variants in play
+setup_tbl <- dplyr::bind_rows(intervals_tbl, intervals_tbl) |>
+  dplyr::mutate(
+    config = config_file,
+    scenario = scenarios,
+    dataset = "national",
+    user = "nhp.devs",
+    seed = 8963L,
+    start_year = 2024L,
+    end_year = 2028L,
+    model_runs = 512L,
+    ndg_variant = paste0("ndg", ndg_variants)
+  )
+
+files_out <- purrr::pmap_chr(setup_tbl, modparams::write_params_json)
+modparams::validate_files(files_out, model_version)
 ```
