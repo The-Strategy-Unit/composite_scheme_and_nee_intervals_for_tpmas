@@ -52,7 +52,10 @@ Or <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> then `Git: Clone`.
 
 This is achieved by rendering the Quarto file `create_custom_intervals.qmd`.
 
-Before rendering, set the params at the top of the file as desired:
+Before rendering you should:
+
+1. Have run `azkit::get_auth_token()` at the R console, without error
+2. Set the params at the top of the file as desired:
 
 - `horizon_years`: an integer, the number of years of activity mitigation
   between the baseline and horizon. Multiple values can be handled using a YAML
@@ -101,3 +104,12 @@ Rendering `create_custom_intervals.qmd` requires the following R packages:
 * distr
 * gt
 * httr2
+
+You can ensure these are installed by running:
+
+```r
+# install.packages("pak") # if not already installed
+pak::pak("The-Strategy-Unit/azkit")
+pak::pak(c("dplyr", "forcats", "purrr", "readr", "rlang", "tibble", "tidyr"))
+pak::pak(c("base64enc", "distr", "gt", "httr2"))
+```
