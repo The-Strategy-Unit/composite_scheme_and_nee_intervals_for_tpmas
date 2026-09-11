@@ -19,6 +19,18 @@ get_tpma_data <- function() {
       type = "activity_type",
       change_factor = "tpma_type",
       strategy = "tpma_variable"
+    ) |>
+    dplyr::mutate(
+      dplyr::across("type", \(x) {
+        dplyr::recode_values(
+          x,
+          "A&E" ~ "aae",
+          "Inpatients" ~ "ip",
+          "Outpatients" ~ "op",
+          unmatched = "error"
+        )
+      }),
+      dplyr::across("change_factor", \(x) tolower(gsub("\\s", "_", x)))
     )
 }
 
