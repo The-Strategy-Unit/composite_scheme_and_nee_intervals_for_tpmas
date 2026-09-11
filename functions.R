@@ -5,20 +5,20 @@ get_tpma_data <- function() {
     httr2::req_url_path_append("TPMAs") |>
     httr2::req_url_path_append("contents") |>
     httr2::req_url_path_append("reference") |>
-    httr2::req_url_path_append("mitigator-lookup.csv") |>
+    httr2::req_url_path_append("tpma-lookup.csv") |>
     httr2::req_perform() |>
     httr2::resp_check_status()
 
   httr2::resp_body_json(resp) |>
     purrr::pluck("content") |>
     base64enc::base64decode() |>
-    readr::read_csv(col_types = "ccc-----c") |>
+    readr::read_csv(col_types = "---ccc---c") |>
     # only keep currently active TPMAs
     dplyr::filter(dplyr::if_any("active_to", is.na)) |>
     dplyr::select(
       type = "activity_type",
-      change_factor = "mitigator_type",
-      strategy = "mitigator_variable"
+      change_factor = "tpma_type",
+      strategy = "tpma_variable"
     )
 }
 
