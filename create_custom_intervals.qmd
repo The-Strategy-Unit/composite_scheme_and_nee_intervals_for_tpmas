@@ -49,7 +49,7 @@ runs_table <- azkit::read_azure_table(
   filter = paste0("run_stage eq '", run_stages, "'", collapse = " or "),
   select = paste0(table_cols, collapse = ",")
 ) |>
-  dplyr::select(tidyselect::all_of(table_cols)) |> # just reordering cols!
+  dplyr::relocate(tidyselect::all_of(table_cols)) |> # just reordering cols!
   dplyr::slice_min(
     match(.data[["run_stage"]], {{ run_stages }}),
     by = "dataset"
@@ -84,7 +84,7 @@ combined_intervals_tbl <- runs_table |>
   purrr::map_depth(2, create_intervals_tbl) |>
   purrr::map(\(x) purrr::list_rbind(x, names_to = "change_factor")) |>
   purrr::list_rbind(names_to = "dataset") |>
-  # only include current approved set of strategies
+  # only include currently active set of strategies
   dplyr::inner_join(tpma_data, c("type", "change_factor", "strategy"))
 ```
 
