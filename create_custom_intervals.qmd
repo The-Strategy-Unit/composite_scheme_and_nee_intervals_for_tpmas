@@ -39,9 +39,18 @@ run_stages <- c(
   "final_report_ndg2", "final_report_ndg3"
 )
 
-runs_table <- azkit::read_azure_table("modelruns", token = token) |>
-  dplyr::select(tidyselect::all_of(table_cols)) |>
-  dplyr::filter(dplyr::if_any("run_stage", \(x) x %in% {{ run_stages }})) |>
+runs_table_name <- Sys.getenv("AZ_TABLE_NAME")
+if (runs_table_name == "") {
+  stop("The environment variable 'AZ_TABLE_NAME' must be set")
+}
+
+runs_table <- azkit::read_azure_table(
+  runs_table_name,
+  token = token,
+  filter = paste0("run_stage eq '", run_stages, "'", collapse = " or "),
+  select = paste0(table_cols, collapse = ",")
+) |>
+  dplyr::select(tidyselect::all_of(table_cols)) |> # just reordering cols!
   dplyr::slice_min(
     match(.data[["run_stage"]], {{ run_stages }}),
     by = "dataset"
