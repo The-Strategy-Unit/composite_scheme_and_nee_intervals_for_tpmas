@@ -66,7 +66,6 @@ Before rendering you should:
 - `create_rds_file`: logical, `true` by default. Set to `false` to prevent
   writing the list of data frames to an `rds` file
 - `rds_filename` as a string: the name of the rds file to create
-- `include_zero_mitigation`: logical, `false` by default. Whether to append to
   the data list a table with all intervals set to `c(1, 1)` to the list. (That
   is, data for a scenario with no mitigation applied across all TPMAs).
 
