@@ -9,7 +9,6 @@ params:
   horizon_years: 20
   create_rds_file: true
   rds_filename: example
-  include_zero_mitigation: false
 ---
 
 ```{r}
@@ -218,21 +217,8 @@ final_joined_table <- horizon_years |>
 
 ```{r}
 #| label: convert-table-to-named-list
-scenario_data <- final_joined_table |>
-  tidyr::unite("scenario", c("source", "period"))
-
-if (params[["include_zero_mitigation"]]) {
-  zero_mitigation_tbl <- tpma_data |>
-    dplyr::mutate(
-      dplyr::across("type", \(x) forcats::fct(x, c("ip", "op", "aae"))),
-      scenario = "zero_mitigation",
-      p10 = 1L,
-      p90 = 1L
-    )
-  scenario_data <- dplyr::bind_rows(scenario_data, zero_mitigation_tbl)
-}
-
-intervals_list <- scenario_data |>
+intervals_list <- final_joined_table |>
+  tidyr::unite("scenario", c("source", "period")) |>
   tidyr::nest(.by = "scenario") |>
   tibble::deframe()
 ```
