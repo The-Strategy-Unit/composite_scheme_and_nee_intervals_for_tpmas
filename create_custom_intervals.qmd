@@ -219,12 +219,6 @@ final_joined_table <- horizon_years |>
 ```{r}
 #| label: convert-table-to-named-list
 scenario_data <- final_joined_table |>
-  dplyr::mutate(
-    interval = purrr::map2(.data[["p10"]], .data[["p90"]], \(x, y) {
-      list(interval = c(x, y))
-    }),
-    .keep = "unused"
-  ) |>
   tidyr::unite("scenario", c("source", "period"))
 
 if (params[["include_zero_mitigation"]]) {
@@ -232,7 +226,8 @@ if (params[["include_zero_mitigation"]]) {
     dplyr::mutate(
       dplyr::across("type", \(x) forcats::fct(x, c("ip", "op", "aae"))),
       scenario = "zero_mitigation",
-      interval = purrr::map(nrow(tpma_data), \(x) list(interval = c(1L, 1L)))
+      p10 = 1L,
+      p90 = 1L
     )
   scenario_data <- dplyr::bind_rows(scenario_data, zero_mitigation_tbl)
 }

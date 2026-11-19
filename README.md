@@ -6,12 +6,15 @@ Rendering the Quarto file
 `create_custom_intervals.qmd`
 will generate a list of tables of data, each with the following columns:
 
-* `type`
 * `change_factor`
+* `type`
 * `strategy`
-* `interval` (a list-col of numeric vectors)
+* `p10` (numeric; the lower bound of the 80% prediction interval)
+* `p90` (numeric; the upper bound of the 80% prediction interval)
 
-The list of tables will be written to an rds file in the current working
+The list of tables will have names that appropriately reference the source
+(`nee` or `schemes`) and the number of years to the horizon.
+By default the list will be written to an rds file in the current working
 directory.
 
 See the sections below for how to get started and what you will need to do in
